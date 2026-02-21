@@ -1,30 +1,26 @@
+-- ========================
+-- SERVICES
+-- ========================
+
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
 -- ========================
--- UI SETUP (Wind Style)
+-- LOAD RAYFIELD
 -- ========================
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "BrainrotUI"
-gui.Parent = player:WaitForChild("PlayerGui")
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local main = Instance.new("Frame", gui)
-main.Size = UDim2.new(0,260,0,190)
-main.Position = UDim2.new(0,60,0,200)
-main.BackgroundColor3 = Color3.fromRGB(20,20,20)
-main.BorderSizePixel = 0
-main.Active = true
-main.Draggable = true
-Instance.new("UICorner", main).CornerRadius = UDim.new(0,14)
+local Window = Rayfield:CreateWindow({
+	Name = "Brainrot Teleport",
+	LoadingTitle = "Brainrot Hub",
+	LoadingSubtitle = "Priority Edition",
+	ConfigurationSaving = {
+		Enabled = false
+	}
+})
 
-local title = Instance.new("TextLabel", main)
-title.Size = UDim2.new(1,0,0,40)
-title.BackgroundTransparency = 1
-title.Text = "Brainrot Teleport"
-title.Font = Enum.Font.GothamBold
-title.TextColor3 = Color3.new(1,1,1)
-title.TextScaled = true
+local Tab = Window:CreateTab("Main", 4483362458)
 
 -- ========================
 -- FUNCTIONS
@@ -35,24 +31,10 @@ local function getHRP()
 	return char:WaitForChild("HumanoidRootPart")
 end
 
-local function teleportToSpawn()
-	local spawn = workspace:FindFirstChild("SpawnLocation")
-	if spawn then
-		getHRP().CFrame = spawn.CFrame + Vector3.new(0,3,0)
-	end
-end
-
-local function teleportToBrainrot()
-	local gameFolder = workspace:FindFirstChild("GameFolder")
-	if not gameFolder then return end
+local function teleportToFolder(folder)
+	if not folder then return end
 	
-	local brainrots = gameFolder:FindFirstChild("Brainrots")
-	if not brainrots then return end
-	
-	local secret = brainrots:FindFirstChild("Secret")
-	if not secret then return end
-	
-	for _, model in pairs(secret:GetChildren()) do
+	for _, model in pairs(folder:GetChildren()) do
 		if model:IsA("Model") and model:FindFirstChild("RootPart") then
 			getHRP().CFrame = model.RootPart.CFrame + Vector3.new(0,3,0)
 			return
@@ -61,71 +43,70 @@ local function teleportToBrainrot()
 end
 
 -- ========================
--- BUTTON: TELEPORT SPAWN
+-- VARIABLES
 -- ========================
 
-local spawnBtn = Instance.new("TextButton", main)
-spawnBtn.Size = UDim2.new(0.9,0,0,40)
-spawnBtn.Position = UDim2.new(0.05,0,0,55)
-spawnBtn.Text = "Teleport To Spawn"
-spawnBtn.Font = Enum.Font.Gotham
-spawnBtn.TextScaled = true
-spawnBtn.TextColor3 = Color3.new(1,1,1)
-spawnBtn.BackgroundColor3 = Color3.fromRGB(35,35,35)
-Instance.new("UICorner", spawnBtn).CornerRadius = UDim.new(0,10)
-
-spawnBtn.MouseButton1Click:Connect(function()
-	teleportToSpawn()
-end)
+local autoSecret = false
+local celestialEnabled = false
+local godlyEnabled = false
 
 -- ========================
--- TOGGLE AUTO BRAINROT
+-- TOGGLES
 -- ========================
 
-local autoEnabled = false
+Tab:CreateToggle({
+	Name = "Auto Secret",
+	CurrentValue = false,
+	Callback = function(Value)
+		autoSecret = Value
+	end,
+})
 
-local toggleBtn = Instance.new("TextButton", main)
-toggleBtn.Size = UDim2.new(0.9,0,0,40)
-toggleBtn.Position = UDim2.new(0.05,0,0,110)
-toggleBtn.Text = "Auto Brainrot: OFF"
-toggleBtn.Font = Enum.Font.Gotham
-toggleBtn.TextScaled = true
-toggleBtn.TextColor3 = Color3.new(1,1,1)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(35,35,35)
-Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0,10)
+Tab:CreateToggle({
+	Name = "Auto Celestial",
+	CurrentValue = false,
+	Callback = function(Value)
+		celestialEnabled = Value
+	end,
+})
 
-toggleBtn.MouseButton1Click:Connect(function()
-	autoEnabled = not autoEnabled
-	
-	if autoEnabled then
-		toggleBtn.Text = "Auto Brainrot: ON"
-		toggleBtn.BackgroundColor3 = Color3.fromRGB(60,120,60)
-	else
-		toggleBtn.Text = "Auto Brainrot: OFF"
-		toggleBtn.BackgroundColor3 = Color3.fromRGB(35,35,35)
-	end
-end)
+Tab:CreateToggle({
+	Name = "Auto Godly (Priority)",
+	CurrentValue = false,
+	Callback = function(Value)
+		godlyEnabled = Value
+	end,
+})
 
 -- ========================
--- AUTO DETECT LOOP
+-- PRIORITY LOOP
 -- ========================
 
 task.spawn(function()
 	while true do
 		task.wait(1)
+
+		local gameFolder = workspace:FindFirstChild("GameFolder")
+		if not gameFolder then continue end
 		
-		if autoEnabled then
-			local secretFolder = workspace:FindFirstChild("GameFolder")
-			if secretFolder then
-				secretFolder = secretFolder:FindFirstChild("Brainrots")
-			end
-			if secretFolder then
-				secretFolder = secretFolder:FindFirstChild("Secret")
-			end
-			
-			if secretFolder and #secretFolder:GetChildren() > 0 then
-				teleportToBrainrot()
-			end
+		local brainrots = gameFolder:FindFirstChild("Brainrots")
+		if not brainrots then continue end
+
+		local godly = brainrots:FindFirstChild("Godly")
+		local celestial = brainrots:FindFirstChild("Celestial")
+		local secret = brainrots:FindFirstChild("Secret")
+
+		-- 1️⃣ GODLY FIRST
+		if godlyEnabled and godly and #godly:GetChildren() > 0 then
+			teleportToFolder(godly)
+
+		-- 2️⃣ CELESTIAL SECOND
+		elseif celestialEnabled and celestial and #celestial:GetChildren() > 0 then
+			teleportToFolder(celestial)
+
+		-- 3️⃣ SECRET LAST
+		elseif autoSecret and secret and #secret:GetChildren() > 0 then
+			teleportToFolder(secret)
 		end
 	end
 end)
