@@ -1,0 +1,201 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+
+-- ========================
+-- GUI
+-- ========================
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "BrainrotUI"
+gui.Parent = player:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+-- Main Frame
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 420, 0, 260)
+main.Position = UDim2.new(0.5, -210, 0.5, -130)
+main.BackgroundColor3 = Color3.fromRGB(18,18,18)
+main.BorderSizePixel = 0
+Instance.new("UICorner", main).CornerRadius = UDim.new(0,16)
+
+-- Stroke
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(40,40,40)
+stroke.Thickness = 1
+
+-- ========================
+-- DRAG SYSTEM (SMOOTH)
+-- ========================
+
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+	local delta = input.Position - dragStart
+	main.Position = UDim2.new(
+		startPos.X.Scale,
+		startPos.X.Offset + delta.X,
+		startPos.Y.Scale,
+		startPos.Y.Offset + delta.Y
+	)
+end
+
+main.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = main.Position
+		
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+main.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		dragInput = input
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		update(input)
+	end
+end)
+
+-- ========================
+-- SIDEBAR
+-- ========================
+
+local sidebar = Instance.new("Frame", main)
+sidebar.Size = UDim2.new(0,120,1,0)
+sidebar.BackgroundColor3 = Color3.fromRGB(14,14,14)
+sidebar.BorderSizePixel = 0
+Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0,16)
+
+local tabTitle = Instance.new("TextLabel", sidebar)
+tabTitle.Size = UDim2.new(1,0,0,50)
+tabTitle.BackgroundTransparency = 1
+tabTitle.Text = "Brainrot"
+tabTitle.Font = Enum.Font.GothamBold
+tabTitle.TextColor3 = Color3.new(1,1,1)
+tabTitle.TextScaled = true
+
+-- ========================
+-- CONTENT AREA
+-- ========================
+
+local content = Instance.new("Frame", main)
+content.Position = UDim2.new(0,120,0,0)
+content.Size = UDim2.new(1,-120,1,0)
+content.BackgroundTransparency = 1
+
+local layout = Instance.new("UIListLayout", content)
+layout.Padding = UDim.new(0,12)
+
+local padding = Instance.new("UIPadding", content)
+padding.PaddingTop = UDim.new(0,20)
+padding.PaddingLeft = UDim.new(0,20)
+padding.PaddingRight = UDim.new(0,20)
+
+-- ========================
+-- SECTION LABEL
+-- ========================
+
+local section = Instance.new("TextLabel", content)
+section.Size = UDim2.new(1,0,0,30)
+section.BackgroundTransparency = 1
+section.Text = "Teleport Section"
+section.Font = Enum.Font.GothamSemibold
+section.TextColor3 = Color3.fromRGB(170,170,170)
+section.TextSize = 16
+section.TextXAlignment = Enum.TextXAlignment.Left
+
+-- ========================
+-- MODERN BUTTON
+-- ========================
+
+local function createButton(text)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1,0,0,40)
+	btn.BackgroundColor3 = Color3.fromRGB(28,28,28)
+	btn.Text = text
+	btn.Font = Enum.Font.Gotham
+	btn.TextSize = 14
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.AutoButtonColor = false
+	
+	local corner = Instance.new("UICorner", btn)
+	corner.CornerRadius = UDim.new(0,10)
+	
+	btn.MouseEnter:Connect(function()
+		btn.BackgroundColor3 = Color3.fromRGB(35,35,35)
+	end)
+	
+	btn.MouseLeave:Connect(function()
+		btn.BackgroundColor3 = Color3.fromRGB(28,28,28)
+	end)
+	
+	return btn
+end
+
+-- Spawn Button
+local spawnBtn = createButton("Teleport To Spawn")
+spawnBtn.Parent = content
+
+-- ========================
+-- MODERN SWITCH
+-- ========================
+
+local autoEnabled = false
+
+local switchFrame = Instance.new("Frame", content)
+switchFrame.Size = UDim2.new(1,0,0,40)
+switchFrame.BackgroundColor3 = Color3.fromRGB(28,28,28)
+Instance.new("UICorner", switchFrame).CornerRadius = UDim.new(0,10)
+
+local switchLabel = Instance.new("TextLabel", switchFrame)
+switchLabel.Size = UDim2.new(0.7,0,1,0)
+switchLabel.BackgroundTransparency = 1
+switchLabel.Text = "Auto Brainrot"
+switchLabel.Font = Enum.Font.Gotham
+switchLabel.TextSize = 14
+switchLabel.TextColor3 = Color3.new(1,1,1)
+switchLabel.TextXAlignment = Enum.TextXAlignment.Left
+switchLabel.Position = UDim2.new(0,10,0,0)
+
+local toggle = Instance.new("Frame", switchFrame)
+toggle.Size = UDim2.new(0,40,0,20)
+toggle.Position = UDim2.new(1,-50,0.5,-10)
+toggle.BackgroundColor3 = Color3.fromRGB(50,50,50)
+Instance.new("UICorner", toggle).CornerRadius = UDim.new(1,0)
+
+local circle = Instance.new("Frame", toggle)
+circle.Size = UDim2.new(0,18,0,18)
+circle.Position = UDim2.new(0,1,0,1)
+circle.BackgroundColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", circle).CornerRadius = UDim.new(1,0)
+
+toggle.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		autoEnabled = not autoEnabled
+		
+		if autoEnabled then
+			toggle.BackgroundColor3 = Color3.fromRGB(0,170,100)
+			circle:TweenPosition(UDim2.new(1,-19,0,1),"Out","Quad",0.2,true)
+		else
+			toggle.BackgroundColor3 = Color3.fromRGB(50,50,50)
+			circle:TweenPosition(UDim2.new(0,1,0,1),"Out","Quad",0.2,true)
+		end
+	end
+end)
+
+spawnBtn.MouseButton1Click:Connect(function()
+	local spawn = workspace:FindFirstChild("SpawnLocation")
+	if spawn then
+		player.Character.HumanoidRootPart.CFrame = spawn.CFrame + Vector3.new(0,3,0)
+	end
+    end)
