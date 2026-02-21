@@ -3,6 +3,7 @@
 -- ========================
 
 local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 
 -- ========================
@@ -12,12 +13,12 @@ local player = Players.LocalPlayer
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-	Name = "Brainrot Teleport",
-	LoadingTitle = "Brainrot Hub",
-	LoadingSubtitle = "Priority Edition",
-	ConfigurationSaving = {
-		Enabled = false
-	}
+ Name = "Brainrot Teleport",
+ LoadingTitle = "Brainrot Hub",
+ LoadingSubtitle = "Priority Edition",
+ ConfigurationSaving = {
+  Enabled = false
+ }
 })
 
 local Tab = Window:CreateTab("Main", 4483362458)
@@ -27,19 +28,88 @@ local Tab = Window:CreateTab("Main", 4483362458)
 -- ========================
 
 local function getHRP()
-	local char = player.Character or player.CharacterAdded:Wait()
-	return char:WaitForChild("HumanoidRootPart")
+ local char = player.Character or player.CharacterAdded:Wait()
+ return char:WaitForChild("HumanoidRootPart")
+end
+
+local function teleportToSpawn()
+ local spawn = workspace:FindFirstChild("SpawnLocation", true)
+ if spawn and spawn:IsA("BasePart") then
+  getHRP().CFrame = spawn.CFrame + Vector3.new(0,3,0)
+ end
+end
+
+-- 🔹 INTERACT VIA VIRTUAL INPUT
+local function interactWithPrompt(prompt)
+ if not prompt then return false end
+
+ local character = player.Character or player.CharacterAdded:Wait()
+ local hrp = character:WaitForChild("HumanoidRootPart")
+
+ if prompt.Parent and prompt.Parent:IsA("BasePart") then
+  local distance = (hrp.Position - prompt.Parent.Position).Magnitude
+  if distance > prompt.MaxActivationDistance then
+   return false
+  end
+ end
+
+ local holdTime = prompt.HoldDuration > 0 and prompt.HoldDuration or 0.3
+
+ -- simulasi tekan E
+ VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+ task.wait(holdTime + 0)
+ VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+
+ return true
+end
+
+-- 🔹 TRIGGER PROMPT (VIRTUAL INPUT + FIREPROXIMITYPROMPT)
+local function triggerProximityPrompt(model)
+ if not model then return false end
+ 
+ local root = model:FindFirstChild("RootPart")
+ if not root then return false end
+ 
+ local prompt = root:FindFirstChildOfClass("ProximityPrompt")
+ if not prompt then return false end
+ 
+ -- teleport dekat dulu
+ getHRP().CFrame = root.CFrame + Vector3.new(0,2,0)
+ task.wait(0.1)
+
+ -- Virtual input dulu (biar kayak manual)
+ interactWithPrompt(prompt)
+ task.wait(0.2)
+
+ -- backup pakai fireproximityprompt
+ pcall(function()
+  fireproximityprompt(prompt)
+ end)
+
+ return true
 end
 
 local function teleportToFolder(folder)
-	if not folder then return end
-	
-	for _, model in pairs(folder:GetChildren()) do
-		if model:IsA("Model") and model:FindFirstChild("RootPart") then
-			getHRP().CFrame = model.RootPart.CFrame + Vector3.new(0,3,0)
-			return
-		end
-	end
+ if not folder then return end
+ 
+ for _, model in pairs(folder:GetChildren()) do
+  if model:IsA("Model") and model:FindFirstChild("RootPart") then
+   
+   local root = model.RootPart
+   
+   getHRP().CFrame = root.CFrame + Vector3.new(0,2,0)
+   task.wait(0.2)
+   
+   local interacted = triggerProximityPrompt(model)
+   task.wait(0.2)
+   
+   if interacted then
+    teleportToSpawn()
+   end
+   
+   return
+  end
+ end
 end
 
 -- ========================
@@ -55,27 +125,27 @@ local godlyEnabled = false
 -- ========================
 
 Tab:CreateToggle({
-	Name = "Auto Secret",
-	CurrentValue = false,
-	Callback = function(Value)
-		autoSecret = Value
-	end,
+ Name = "Auto Secret",
+ CurrentValue = false,
+ Callback = function(Value)
+  autoSecret = Value
+ end,
 })
 
 Tab:CreateToggle({
-	Name = "Auto Celestial",
-	CurrentValue = false,
-	Callback = function(Value)
-		celestialEnabled = Value
-	end,
+ Name = "Auto Celestial",
+ CurrentValue = false,
+ Callback = function(Value)
+  celestialEnabled = Value
+ end,
 })
 
 Tab:CreateToggle({
-	Name = "Auto Godly (Priority)",
-	CurrentValue = false,
-	Callback = function(Value)
-		godlyEnabled = Value
-	end,
+ Name = "Auto Godly (Priority)",
+ CurrentValue = false,
+ Callback = function(Value)
+  godlyEnabled = Value
+ end,
 })
 
 -- ========================
@@ -83,30 +153,30 @@ Tab:CreateToggle({
 -- ========================
 
 task.spawn(function()
-	while true do
-		task.wait(1)
+ while true do
+  task.wait(0.3)
 
-		local gameFolder = workspace:FindFirstChild("GameFolder")
-		if not gameFolder then continue end
-		
-		local brainrots = gameFolder:FindFirstChild("Brainrots")
-		if not brainrots then continue end
+  local gameFolder = workspace:FindFirstChild("GameFolder")
+  if not gameFolder then continue end
+  
+  local brainrots = gameFolder:FindFirstChild("Brainrots")
+  if not brainrots then continue end
 
-		local godly = brainrots:FindFirstChild("Godly")
-		local celestial = brainrots:FindFirstChild("Celestial")
-		local secret = brainrots:FindFirstChild("Secret")
+  local godly = brainrots:FindFirstChild("Godly")
+  local celestial = brainrots:FindFirstChild("Celestial")
+  local secret = brainrots:FindFirstChild("Secret")
 
-		-- 1️⃣ GODLY FIRST
-		if godlyEnabled and godly and #godly:GetChildren() > 0 then
-			teleportToFolder(godly)
+  -- 1️⃣ GODLY FIRST
+  if godlyEnabled and godly and #godly:GetChildren() > 0 then
+   teleportToFolder(godly)
 
-		-- 2️⃣ CELESTIAL SECOND
-		elseif celestialEnabled and celestial and #celestial:GetChildren() > 0 then
-			teleportToFolder(celestial)
+  -- 2️⃣ CELESTIAL SECOND
+  elseif celestialEnabled and celestial and #celestial:GetChildren() > 0 then
+   teleportToFolder(celestial)
 
-		-- 3️⃣ SECRET LAST
-		elseif autoSecret and secret and #secret:GetChildren() > 0 then
-			teleportToFolder(secret)
-		end
-	end
+  -- 3️⃣ SECRET LAST
+  elseif autoSecret and secret and #secret:GetChildren() > 0 then
+   teleportToFolder(secret)
+  end
+ end
 end)
