@@ -27,7 +27,7 @@ getgenv().GodlyHop = getgenv().GodlyHop or false
 -- ========================
 
 if queue_on_teleport then
- queue_on_teleport(game:HttpGet("https://pastebin.com/raw/REPLACE_WITH_YOUR_SCRIPT"))
+ queue_on_teleport(game:HttpGet("https://raw.githubusercontent.com/changelog-modul/cobacoba/refs/heads/main/v1"))
 end
 
 -- ========================
