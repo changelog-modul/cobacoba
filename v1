@@ -22,162 +22,178 @@ getgenv().CelestialHop = getgenv().CelestialHop or false
 getgenv().GodlyHop = getgenv().GodlyHop or false
 getgenv().LastJobId = getgenv().LastJobId or nil
 
+-- NEW AUTO CLAIM
+getgenv().AutoClaimMoney = getgenv().AutoClaimMoney or false
+
 -- ========================
 -- LOAD RAYFIELD
 -- ========================
 
 local success, Rayfield = pcall(function()
- return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 end)
 
 if not success then
- warn("Rayfield gagal load")
- return
+    warn("Rayfield gagal load")
+    return
 end
 
 local Window = Rayfield:CreateWindow({
- Name = "Brainrot Teleport",
- LoadingTitle = "Brainrot Hub",
- LoadingSubtitle = "Priority Edition",
- ConfigurationSaving = { Enabled = false }
+    Name = "Brainrot Teleport",
+    LoadingTitle = "Brainrot Hub",
+    LoadingSubtitle = "Priority Edition",
+    ConfigurationSaving = { Enabled = false }
 })
 
-local Tab = Window:CreateTab("Main", 4483362458)
+local MainTab = Window:CreateTab("Main", 4483362458)
+local ClaimTab = Window:CreateTab("Auto Claim", 4483362458)
 
 -- ========================
 -- FUNCTIONS
 -- ========================
 
 local function getHRP()
- local char = player.Character or player.CharacterAdded:Wait()
- return char:WaitForChild("HumanoidRootPart")
+    local char = player.Character or player.CharacterAdded:Wait()
+    return char:WaitForChild("HumanoidRootPart")
 end
 
 local function teleportToSpawn()
- local spawn = workspace:FindFirstChild("SpawnLocation", true)
- if spawn and spawn:IsA("BasePart") then
-  getHRP().CFrame = spawn.CFrame + Vector3.new(0,3,0)
- end
+    local spawn = workspace:FindFirstChild("SpawnLocation", true)
+    if spawn and spawn:IsA("BasePart") then
+        getHRP().CFrame = spawn.CFrame + Vector3.new(0,3,0)
+    end
 end
 
 local function interactWithPrompt(prompt)
- if not prompt then return false end
+    if not prompt then return false end
 
- local holdTime = prompt.HoldDuration > 0 and prompt.HoldDuration or 0.3
+    local holdTime = prompt.HoldDuration > 0 and prompt.HoldDuration or 0.3
 
- VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
- task.wait(holdTime)
- VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(holdTime)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 
- return true
+    return true
 end
 
 local function triggerProximityPrompt(model)
- if not model then return false end
- 
- local root = model:FindFirstChild("RootPart")
- if not root then return false end
- 
- local prompt = root:FindFirstChildOfClass("ProximityPrompt")
- if not prompt then return false end
- 
- getHRP().CFrame = root.CFrame + Vector3.new(0,2,0)
- task.wait(0.15)
+    if not model then return false end
+    
+    local root = model:FindFirstChild("RootPart")
+    if not root then return false end
+    
+    local prompt = root:FindFirstChildOfClass("ProximityPrompt")
+    if not prompt then return false end
+    
+    getHRP().CFrame = root.CFrame + Vector3.new(0,2,0)
+    task.wait(0.15)
 
- interactWithPrompt(prompt)
- task.wait(0.2)
+    interactWithPrompt(prompt)
+    task.wait(0.2)
 
- pcall(function()
-  fireproximityprompt(prompt)
- end)
+    pcall(function()
+        fireproximityprompt(prompt)
+    end)
 
- return true
+    return true
 end
 
 local function teleportToFolder(folder)
- if not folder then return end
- 
- for _, model in pairs(folder:GetChildren()) do
-  if model:IsA("Model") and model:FindFirstChild("RootPart") then
-   
-   getHRP().CFrame = model.RootPart.CFrame + Vector3.new(0,2,0)
-   task.wait(0.2)
-   
-   local interacted = triggerProximityPrompt(model)
-   task.wait(0.3)
-   
-   if interacted then
-    teleportToSpawn()
-   end
-   
-   return
-  end
- end
+    if not folder then return end
+    
+    for _, model in pairs(folder:GetChildren()) do
+        if model:IsA("Model") and model:FindFirstChild("RootPart") then
+            
+            getHRP().CFrame = model.RootPart.CFrame + Vector3.new(0,2,0)
+            task.wait(0.2)
+            
+            local interacted = triggerProximityPrompt(model)
+            task.wait(0.3)
+            
+            if interacted then
+                teleportToSpawn()
+            end
+            
+            return
+        end
+    end
 end
 
 -- ========================
--- DELTA SAFE SERVER HOP
+-- SERVER HOP
 -- ========================
 
 local function serverHop()
- if getgenv().LastJobId == game.JobId then
-  task.wait(2) -- kalau balik ke server sama, tunggu lalu hop lagi
- end
- 
- getgenv().LastJobId = game.JobId
- TeleportService:Teleport(PlaceId)
+    if getgenv().LastJobId == game.JobId then
+        task.wait(2)
+    end
+    
+    getgenv().LastJobId = game.JobId
+    TeleportService:Teleport(PlaceId)
 end
 
 -- ========================
--- TOGGLES
+-- TOGGLES MAIN
 -- ========================
 
-Tab:CreateToggle({
- Name = "Auto Secret",
- CurrentValue = getgenv().AutoSecret,
- Callback = function(Value)
-  getgenv().AutoSecret = Value
- end,
+MainTab:CreateToggle({
+    Name = "Auto Secret",
+    CurrentValue = getgenv().AutoSecret,
+    Callback = function(Value)
+        getgenv().AutoSecret = Value
+    end,
 })
 
-Tab:CreateToggle({
- Name = "Auto Celestial",
- CurrentValue = getgenv().CelestialEnabled,
- Callback = function(Value)
-  getgenv().CelestialEnabled = Value
- end,
+MainTab:CreateToggle({
+    Name = "Auto Celestial",
+    CurrentValue = getgenv().CelestialEnabled,
+    Callback = function(Value)
+        getgenv().CelestialEnabled = Value
+    end,
 })
 
-Tab:CreateToggle({
- Name = "Auto Godly (Priority)",
- CurrentValue = getgenv().GodlyEnabled,
- Callback = function(Value)
-  getgenv().GodlyEnabled = Value
- end,
+MainTab:CreateToggle({
+    Name = "Auto Godly (Priority)",
+    CurrentValue = getgenv().GodlyEnabled,
+    Callback = function(Value)
+        getgenv().GodlyEnabled = Value
+    end,
 })
 
-Tab:CreateToggle({
- Name = "Server Hop Celestial",
- CurrentValue = getgenv().CelestialHop,
- Callback = function(Value)
-  getgenv().CelestialHop = Value
- end,
+MainTab:CreateToggle({
+    Name = "Server Hop Celestial",
+    CurrentValue = getgenv().CelestialHop,
+    Callback = function(Value)
+        getgenv().CelestialHop = Value
+    end,
 })
 
-Tab:CreateToggle({
- Name = "Server Hop Godly",
- CurrentValue = getgenv().GodlyHop,
- Callback = function(Value)
-  getgenv().GodlyHop = Value
- end,
+MainTab:CreateToggle({
+    Name = "Server Hop Godly",
+    CurrentValue = getgenv().GodlyHop,
+    Callback = function(Value)
+        getgenv().GodlyHop = Value
+    end,
 })
 
-Tab:CreateToggle({
- Name = "Auto Server Hop",
- CurrentValue = getgenv().ServerHopEnabled,
- Callback = function(Value)
-  getgenv().ServerHopEnabled = Value
- end,
+MainTab:CreateToggle({
+    Name = "Auto Server Hop",
+    CurrentValue = getgenv().ServerHopEnabled,
+    Callback = function(Value)
+        getgenv().ServerHopEnabled = Value
+    end,
+})
+
+-- ========================
+-- TOGGLE AUTO CLAIM
+-- ========================
+
+ClaimTab:CreateToggle({
+    Name = "Auto Claim Money (6 Menit)",
+    CurrentValue = getgenv().AutoClaimMoney,
+    Callback = function(Value)
+        getgenv().AutoClaimMoney = Value
+    end,
 })
 
 -- ========================
@@ -185,59 +201,110 @@ Tab:CreateToggle({
 -- ========================
 
 task.spawn(function()
- while true do
-  task.wait(0.3)
+    while true do
+        task.wait(0.3)
 
-  local gameFolder = workspace:FindFirstChild("GameFolder")
-  if not gameFolder then continue end
-  
-  local brainrots = gameFolder:FindFirstChild("Brainrots")
-  if not brainrots then continue end
+        local gameFolder = workspace:FindFirstChild("GameFolder")
+        if not gameFolder then continue end
+        
+        local brainrots = gameFolder:FindFirstChild("Brainrots")
+        if not brainrots then continue end
 
-  local godly = brainrots:FindFirstChild("Godly")
-  local celestial = brainrots:FindFirstChild("Celestial")
-  local secret = brainrots:FindFirstChild("Secret")
+        local godly = brainrots:FindFirstChild("Godly")
+        local celestial = brainrots:FindFirstChild("Celestial")
+        local secret = brainrots:FindFirstChild("Secret")
 
-  if getgenv().GodlyEnabled and godly and #godly:GetChildren() > 0 then
-   teleportToFolder(godly)
+        if getgenv().GodlyEnabled and godly and #godly:GetChildren() > 0 then
+            teleportToFolder(godly)
 
-  elseif getgenv().CelestialEnabled and celestial and #celestial:GetChildren() > 0 then
-   teleportToFolder(celestial)
+        elseif getgenv().CelestialEnabled and celestial and #celestial:GetChildren() > 0 then
+            teleportToFolder(celestial)
 
-  elseif getgenv().AutoSecret and secret and #secret:GetChildren() > 0 then
-   teleportToFolder(secret)
-  end
- end
+        elseif getgenv().AutoSecret and secret and #secret:GetChildren() > 0 then
+            teleportToFolder(secret)
+        end
+    end
 end)
 
 -- ========================
--- AUTO SERVER HOP SYSTEM
+-- AUTO SERVER HOP LOOP
 -- ========================
 
 task.spawn(function()
- while true do
-  task.wait(5)
+    while true do
+        task.wait(5)
 
-  if not getgenv().ServerHopEnabled then continue end
+        if not getgenv().ServerHopEnabled then continue end
 
-  local gameFolder = workspace:FindFirstChild("GameFolder")
-  local brainrots = gameFolder and gameFolder:FindFirstChild("Brainrots")
+        local gameFolder = workspace:FindFirstChild("GameFolder")
+        local brainrots = gameFolder and gameFolder:FindFirstChild("Brainrots")
 
-  local godly = brainrots and brainrots:FindFirstChild("Godly")
-  local celestial = brainrots and brainrots:FindFirstChild("Celestial")
+        local godly = brainrots and brainrots:FindFirstChild("Godly")
+        local celestial = brainrots and brainrots:FindFirstChild("Celestial")
 
-  local foundGodly = godly and #godly:GetChildren() > 0
-  local foundCelestial = celestial and #celestial:GetChildren() > 0
+        local foundGodly = godly and #godly:GetChildren() > 0
+        local foundCelestial = celestial and #celestial:GetChildren() > 0
 
-  if getgenv().GodlyHop then
-   if not foundGodly then
-    serverHop()
-   end
+        if getgenv().GodlyHop then
+            if not foundGodly then
+                serverHop()
+            end
 
-  elseif getgenv().CelestialHop then
-   if not foundCelestial then
-    serverHop()
-   end
-  end
- end
+        elseif getgenv().CelestialHop then
+            if not foundCelestial then
+                serverHop()
+            end
+        end
+    end
+end)
+
+-- ========================
+-- AUTO CLAIM MONEY LOOP
+-- ========================
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+
+        if not getgenv().AutoClaimMoney then
+            continue
+        end
+
+        local char = player.Character or player.CharacterAdded:Wait()
+        local root = char:WaitForChild("HumanoidRootPart")
+
+        local gameFolder = workspace:FindFirstChild("GameFolder")
+        local plotsFolder = gameFolder and gameFolder:FindFirstChild("Plots")
+
+        if plotsFolder then
+            for plotIndex = 1,6 do
+                local plot = plotsFolder:FindFirstChild(tostring(plotIndex))
+                if plot then
+                    local places = plot:FindFirstChild("Places")
+                    if places then
+                        for placeIndex = 1,30 do
+                            local place = places:FindFirstChild(tostring(placeIndex))
+                            if place then
+                                local claim = place:FindFirstChild("Claim")
+                                if claim and claim:IsA("BasePart") then
+                                    
+                                    firetouchinterest(root, claim, 0)
+                                    task.wait()
+                                    firetouchinterest(root, claim, 1)
+
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        for i = 1,360 do
+            if not getgenv().AutoClaimMoney then
+                break
+            end
+            task.wait(1)
+        end
+    end
 end)
