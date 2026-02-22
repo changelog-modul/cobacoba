@@ -3,8 +3,32 @@
 -- ========================
 
 local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+
 local player = Players.LocalPlayer
+local PlaceId = game.PlaceId
+
+-- ========================
+-- GLOBAL SAVE (ANTI RESET SETELAH HOP)
+-- ========================
+
+getgenv().AutoSecret = getgenv().AutoSecret or false
+getgenv().CelestialEnabled = getgenv().CelestialEnabled or false
+getgenv().GodlyEnabled = getgenv().GodlyEnabled or false
+
+getgenv().ServerHopEnabled = getgenv().ServerHopEnabled or false
+getgenv().CelestialHop = getgenv().CelestialHop or false
+getgenv().GodlyHop = getgenv().GodlyHop or false
+
+-- ========================
+-- AUTO RE-EXECUTE AFTER TELEPORT
+-- ========================
+
+if queue_on_teleport then
+ queue_on_teleport(game:HttpGet("https://pastebin.com/raw/REPLACE_WITH_YOUR_SCRIPT"))
+end
 
 -- ========================
 -- LOAD RAYFIELD
@@ -16,9 +40,7 @@ local Window = Rayfield:CreateWindow({
  Name = "Brainrot Teleport",
  LoadingTitle = "Brainrot Hub",
  LoadingSubtitle = "Priority Edition",
- ConfigurationSaving = {
-  Enabled = false
- }
+ ConfigurationSaving = { Enabled = false }
 })
 
 local Tab = Window:CreateTab("Main", 4483362458)
@@ -39,31 +61,18 @@ local function teleportToSpawn()
  end
 end
 
--- 🔹 INTERACT VIA VIRTUAL INPUT
 local function interactWithPrompt(prompt)
  if not prompt then return false end
 
- local character = player.Character or player.CharacterAdded:Wait()
- local hrp = character:WaitForChild("HumanoidRootPart")
-
- if prompt.Parent and prompt.Parent:IsA("BasePart") then
-  local distance = (hrp.Position - prompt.Parent.Position).Magnitude
-  if distance > prompt.MaxActivationDistance then
-   return false
-  end
- end
-
  local holdTime = prompt.HoldDuration > 0 and prompt.HoldDuration or 0.3
 
- -- simulasi tekan E
  VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
- task.wait(holdTime + 0)
+ task.wait(holdTime)
  VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 
  return true
 end
 
--- 🔹 TRIGGER PROMPT (VIRTUAL INPUT + FIREPROXIMITYPROMPT)
 local function triggerProximityPrompt(model)
  if not model then return false end
  
@@ -73,15 +82,12 @@ local function triggerProximityPrompt(model)
  local prompt = root:FindFirstChildOfClass("ProximityPrompt")
  if not prompt then return false end
  
- -- teleport dekat dulu
  getHRP().CFrame = root.CFrame + Vector3.new(0,2,0)
- task.wait(0.1)
+ task.wait(0.15)
 
- -- Virtual input dulu (biar kayak manual)
  interactWithPrompt(prompt)
  task.wait(0.2)
 
- -- backup pakai fireproximityprompt
  pcall(function()
   fireproximityprompt(prompt)
  end)
@@ -95,13 +101,11 @@ local function teleportToFolder(folder)
  for _, model in pairs(folder:GetChildren()) do
   if model:IsA("Model") and model:FindFirstChild("RootPart") then
    
-   local root = model.RootPart
-   
-   getHRP().CFrame = root.CFrame + Vector3.new(0,2,0)
+   getHRP().CFrame = model.RootPart.CFrame + Vector3.new(0,2,0)
    task.wait(0.2)
    
    local interacted = triggerProximityPrompt(model)
-   task.wait(0.2)
+   task.wait(0.3)
    
    if interacted then
     teleportToSpawn()
@@ -113,12 +117,31 @@ local function teleportToFolder(folder)
 end
 
 -- ========================
--- VARIABLES
+-- SERVER HOP FUNCTION
 -- ========================
 
-local autoSecret = false
-local celestialEnabled = false
-local godlyEnabled = false
+local function serverHop()
+ local req = game:HttpGet(
+  "https://games.roblox.com/v1/games/"..PlaceId.."/servers/Public?sortOrder=Asc&limit=100"
+ )
+ 
+ local data = HttpService:JSONDecode(req)
+ local servers = {}
+
+ for _, v in pairs(data.data) do
+  if v.playing < v.maxPlayers and v.id ~= game.JobId then
+   table.insert(servers, v.id)
+  end
+ end
+
+ if #servers > 0 then
+  TeleportService:TeleportToPlaceInstance(
+   PlaceId,
+   servers[math.random(1,#servers)],
+   player
+  )
+ end
+end
 
 -- ========================
 -- TOGGLES
@@ -126,30 +149,54 @@ local godlyEnabled = false
 
 Tab:CreateToggle({
  Name = "Auto Secret",
- CurrentValue = false,
+ CurrentValue = getgenv().AutoSecret,
  Callback = function(Value)
-  autoSecret = Value
+  getgenv().AutoSecret = Value
  end,
 })
 
 Tab:CreateToggle({
  Name = "Auto Celestial",
- CurrentValue = false,
+ CurrentValue = getgenv().CelestialEnabled,
  Callback = function(Value)
-  celestialEnabled = Value
+  getgenv().CelestialEnabled = Value
  end,
 })
 
 Tab:CreateToggle({
  Name = "Auto Godly (Priority)",
- CurrentValue = false,
+ CurrentValue = getgenv().GodlyEnabled,
  Callback = function(Value)
-  godlyEnabled = Value
+  getgenv().GodlyEnabled = Value
+ end,
+})
+
+Tab:CreateToggle({
+ Name = "Server Hop Celestial",
+ CurrentValue = getgenv().CelestialHop,
+ Callback = function(Value)
+  getgenv().CelestialHop = Value
+ end,
+})
+
+Tab:CreateToggle({
+ Name = "Server Hop Godly",
+ CurrentValue = getgenv().GodlyHop,
+ Callback = function(Value)
+  getgenv().GodlyHop = Value
+ end,
+})
+
+Tab:CreateToggle({
+ Name = "Auto Server Hop",
+ CurrentValue = getgenv().ServerHopEnabled,
+ Callback = function(Value)
+  getgenv().ServerHopEnabled = Value
  end,
 })
 
 -- ========================
--- PRIORITY LOOP
+-- PRIORITY TELEPORT LOOP
 -- ========================
 
 task.spawn(function()
@@ -166,17 +213,46 @@ task.spawn(function()
   local celestial = brainrots:FindFirstChild("Celestial")
   local secret = brainrots:FindFirstChild("Secret")
 
-  -- 1️⃣ GODLY FIRST
-  if godlyEnabled and godly and #godly:GetChildren() > 0 then
+  if getgenv().GodlyEnabled and godly and #godly:GetChildren() > 0 then
    teleportToFolder(godly)
 
-  -- 2️⃣ CELESTIAL SECOND
-  elseif celestialEnabled and celestial and #celestial:GetChildren() > 0 then
+  elseif getgenv().CelestialEnabled and celestial and #celestial:GetChildren() > 0 then
    teleportToFolder(celestial)
 
-  -- 3️⃣ SECRET LAST
-  elseif autoSecret and secret and #secret:GetChildren() > 0 then
+  elseif getgenv().AutoSecret and secret and #secret:GetChildren() > 0 then
    teleportToFolder(secret)
+  end
+ end
+end)
+
+-- ========================
+-- AUTO SERVER HOP SYSTEM
+-- ========================
+
+task.spawn(function()
+ while true do
+  task.wait(5)
+
+  if not getgenv().ServerHopEnabled then continue end
+
+  local gameFolder = workspace:FindFirstChild("GameFolder")
+  local brainrots = gameFolder and gameFolder:FindFirstChild("Brainrots")
+
+  local godly = brainrots and brainrots:FindFirstChild("Godly")
+  local celestial = brainrots and brainrots:FindFirstChild("Celestial")
+
+  local foundGodly = godly and #godly:GetChildren() > 0
+  local foundCelestial = celestial and #celestial:GetChildren() > 0
+
+  if getgenv().GodlyHop then
+   if not foundGodly then
+    serverHop()
+   end
+
+  elseif getgenv().CelestialHop then
+   if not foundCelestial then
+    serverHop()
+   end
   end
  end
 end)
