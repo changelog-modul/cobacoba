@@ -1,0 +1,1386 @@
+-- ===========================================
+-- AUTO LUCKY BLOCK FARMER
+-- Y=-2 + FLY + AUTO SCAN + AUTO TRIGGER
+-- ===========================================
+
+-- Load Rayfield UI
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- ===========================================
+-- VARIABLES
+-- ===========================================
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+
+-- Status
+local autoFarmActive = false
+local flyActive = false
+local noclipActive = false
+
+-- Connections
+local flyConn = nil
+local noclipConn = nil
+local bodyVelocity = nil
+
+-- Target folder
+local targetFolder = workspace:FindFirstChild("ActiveLuckyBlocks")
+local luckyBlocksList = {}
+local currentBlockIndex = 1
+local spawnPosition = nil
+
+-- ===========================================
+-- FUNGSI INIT POSISI SPAWN
+-- ===========================================
+local function saveSpawnPosition()
+    local character = LocalPlayer.Character
+    if not character then return false end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
+    
+    spawnPosition = rootPart.CFrame
+    print("📍 Posisi spawn disimpan:", spawnPosition)
+    return true
+end
+
+-- ===========================================
+-- FUNGSI SET Y = -2 + FLY
+-- ===========================================
+local function setYminus2()
+    local character = LocalPlayer.Character
+    if not character then
+        character = LocalPlayer.CharacterAdded:Wait()
+    end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    -- Set posisi Y = -2
+    rootPart.CFrame = CFrame.new(rootPart.Position.X, -2, rootPart.Position.Z)
+    
+    -- Aktifkan fly biar ga jatuh
+    if not flyActive then
+        -- Matikan BodyVelocity lama kalo ada
+        if bodyVelocity then
+            pcall(function() bodyVelocity:Destroy() end)
+            bodyVelocity = nil
+        end
+        
+        -- Buat BodyVelocity baru
+        bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+        bodyVelocity.Parent = rootPart
+        
+        flyActive = true
+        
+        -- Loop untuk maintain Y = -2
+        flyConn = RunService.RenderStepped:Connect(function()
+            if not flyActive or not autoFarmActive then return end
+            
+            local char = LocalPlayer.Character
+            if not char then return end
+            
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+            
+            -- Force posisi Y = -2 terus
+            if math.abs(root.Position.Y + 2) > 0.5 then
+                root.CFrame = CFrame.new(root.Position.X, -2, root.Position.Z)
+            end
+            
+            -- Maintain velocity
+            if bodyVelocity and bodyVelocity.Parent then
+                bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            end
+        end)
+    end
+    
+    -- Aktifkan noclip
+    if not noclipActive then
+        noclipActive = true
+        noclipConn = RunService.Stepped:Connect(function()
+            if not noclipActive or not autoFarmActive then return end
+            
+            local char = LocalPlayer.Character
+            if not char then return end
+            
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end)
+    end
+    
+    print("✅ Posisi Y = -2, fly aktif, noclip aktif")
+end
+
+-- ===========================================
+-- FUNGSI SCAN LUCKY BLOCKS
+-- ===========================================
+-- ✅ DAFTAR LUCKY BLOCK YANG DIIZINKAN
+local allowedBlocks = {
+    ["celestial"] = true,
+    ["divine"] = true,
+    ["infinity"] = true,
+    ["radio active"] = true,
+    ["radioactive"] = true,
+    ["ufo"] = true,
+    ["money"] = true,
+    ["gamer"] = true,
+    ["candy"] = true,
+    ["alien"] = true,
+    ["jackpot"] = true,
+    ["arcade"] = true,
+    ["sugar rush"] = true,
+    ["sugarrush"] = true,
+    ["admin"] = true,
+}
+
+-- 🔎 FUNCTION CEK APAKAH NAMA MASUK FILTER
+local function isAllowedBlock(name)
+    name = string.lower(name)
+    for allowedName, _ in pairs(allowedBlocks) do
+        if string.find(name, allowedName, 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+-- 🔎 SCAN LUCKY BLOCK DENGAN FILTER
+local function scanLuckyBlocks()
+    luckyBlocksList = {}
+    
+    if not targetFolder then
+        targetFolder = workspace:FindFirstChild("ActiveLuckyBlocks")
+        if not targetFolder then
+            print("❌ Folder ActiveLuckyBlocks tidak ditemukan!")
+            return 0
+        end
+    end
+    
+    local count = 0
+    
+    for _, block in pairs(targetFolder:GetChildren()) do
+        
+        -- ✅ FILTER NAMA BLOCK
+        if isAllowedBlock(block.Name) then
+            
+            -- Cek RootPart
+            local rootPart = block:FindFirstChild("RootPart")
+            if rootPart then
+                local prompt = rootPart:FindFirstChildOfClass("ProximityPrompt")
+                if prompt and prompt.Enabled then
+                    table.insert(luckyBlocksList, {
+                        name = block.Name,
+                        block = block,
+                        rootPart = rootPart,
+                        prompt = prompt,
+                        position = rootPart.Position
+                    })
+                    count = count + 1
+                    print("✅ (FILTERED) Ditemukan:", block.Name)
+                end
+            end
+            
+            -- Cek child lain
+            for _, child in pairs(block:GetChildren()) do
+                if child:IsA("BasePart") then
+                    local prompt = child:FindFirstChildOfClass("ProximityPrompt")
+                    if prompt and prompt.Enabled then
+                        table.insert(luckyBlocksList, {
+                            name = block.Name .. " - " .. child.Name,
+                            block = block,
+                            rootPart = child,
+                            prompt = prompt,
+                            position = child.Position
+                        })
+                        count = count + 1
+                        print("✅ (FILTERED) Ditemukan:", block.Name, "-", child.Name)
+                    end
+                end
+            end
+        else
+            -- Kalau tidak masuk filter
+            -- print("❌ Di-skip:", block.Name)
+        end
+    end
+    
+    print("📊 Total lucky block sesuai filter:", count)
+    return count
+end
+
+-- ===========================================
+-- FUNGSI TERBANG CEPAT KE POSISI
+-- ===========================================
+local function flyToPosition(targetPos, speed)
+    local character = LocalPlayer.Character
+    if not character then return false end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
+    
+    -- Hitung jarak
+    local distance = (targetPos - rootPart.Position).Magnitude
+    local flyTime = distance / speed
+    
+    print("🚀 Terbang ke target, jarak:", math.floor(distance), "studs, estimasi:", math.floor(flyTime * 100) / 100, "detik")
+    
+    -- Pake Tween biar halus
+    local tweenInfo = TweenInfo.new(
+        flyTime,
+        Enum.EasingStyle.Linear,
+        Enum.EasingDirection.Out
+    )
+    
+    local goal = {
+        CFrame = CFrame.new(targetPos.X, -2, targetPos.Z) -- Force Y = -2
+    }
+    
+    local tween = TweenService:Create(rootPart, tweenInfo, goal)
+    tween:Play()
+    
+    -- Tunggu sampe nyampe
+    tween.Completed:Wait()
+    
+    -- Pastikan Y = -2
+    task.wait(0.1)
+    rootPart.CFrame = CFrame.new(targetPos.X, -2, targetPos.Z)
+    
+    return true
+end
+
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local root
+
+--// Character setup
+local function setupChar(char)
+    root = char:WaitForChild("HumanoidRootPart")
+end
+
+if player.Character then
+    setupChar(player.Character)
+end
+player.CharacterAdded:Connect(setupChar)
+
+--// Folder lebih optimal
+local folder = workspace:WaitForChild("ActiveLuckyBlocks")
+
+--// Cache prompt biar tidak scan terus
+local prompts = {}
+
+local function addPrompt(obj)
+    if obj:IsA("ProximityPrompt") then
+        table.insert(prompts, obj)
+    end
+end
+
+local function removePrompt(obj)
+    for i,v in ipairs(prompts) do
+        if v == obj then
+            table.remove(prompts, i)
+            break
+        end
+    end
+end
+
+-- isi awal
+for _,obj in ipairs(folder:GetDescendants()) do
+    addPrompt(obj)
+end
+
+-- listen spawn/remove
+folder.DescendantAdded:Connect(addPrompt)
+folder.DescendantRemoving:Connect(removePrompt)
+
+--// Cari terdekat dari cache
+local function getClosestPrompt()
+    if not root then return end
+    
+    local closest
+    local shortest = math.huge
+
+    for _,prompt in ipairs(prompts) do
+        if prompt.Enabled and prompt.Parent and prompt.Parent:IsA("BasePart") then
+            local dist = (root.Position - prompt.Parent.Position).Magnitude
+            if dist < shortest then
+                shortest = dist
+                closest = prompt
+            end
+        end
+    end
+
+    return closest
+end
+
+--// Trigger via Heartbeat (lebih ringan dari while)
+RunService.Heartbeat:Connect(function()
+    if not root then return end
+    
+    local prompt = getClosestPrompt()
+    if prompt then
+        fireproximityprompt(prompt, 0)
+    end
+end)
+
+-- ===========================================
+-- FUNGSI TRIGGER PROMPT
+-- ===========================================
+local function triggerPrompt(prompt, blockName)
+    if not prompt then return false end
+    
+    local success = pcall(function()
+        -- Set properties
+        prompt.Enabled = true
+        prompt.HoldDuration = 0
+        prompt.RequireLineOfSight = false
+        prompt.MaxActivationDistance = 9e9
+        
+        -- Naik dikit ke Y = -1 buat trigger (biar tepat di depan block)
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 1, -2)
+        end
+        
+        task.wait(0.1)
+        
+        -- Trigger pake berbagai method
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, nil)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
+        
+        -- Remote events
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local remote = ReplicatedStorage:FindFirstChild("ProximityPromptRemote") or
+                      ReplicatedStorage:FindFirstChild("PromptRemote") or
+                      ReplicatedStorage:FindFirstChild("TriggerPrompt")
+        if remote then
+            remote:FireServer(prompt)
+        end
+        
+        -- Kembali ke Y = -2
+        task.wait(0.1)
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            character.HumanoidRootPart.CFrame = CFrame.new(
+                character.HumanoidRootPart.Position.X,
+                -2,
+                character.HumanoidRootPart.Position.Z
+            )
+        end
+    end)
+    
+    if success then
+        print("✅ Trigger berhasil:", blockName)
+    else
+        print("❌ Trigger gagal:", blockName)
+    end
+    
+    return success
+end
+
+-- ===========================================
+-- FUNGSI AUTO FARM LOOP
+-- ===========================================
+local function startAutoFarm()
+    if autoFarmActive then return end
+    
+    -- Save spawn position
+    if not spawnPosition then
+        saveSpawnPosition()
+    end
+    
+    -- Set Y = -2 + fly
+    setYminus2()
+    
+    -- Scan lucky blocks
+    local count = scanLuckyBlocks()
+    if count == 0 then
+        print("❌ Tidak ada lucky block ditemukan!")
+        return
+    end
+    
+    autoFarmActive = true
+    currentBlockIndex = 1
+    
+    print("🚀 AUTO FARM DIMULAI!")
+    
+    -- Loop farming
+    spawn(function()
+        while autoFarmActive do
+            -- Scan ulang setiap selesai 1 putaran
+            if currentBlockIndex > #luckyBlocksList then
+                print("📊 Scan ulang lucky blocks...")
+                scanLuckyBlocks()
+                currentBlockIndex = 1
+                
+                if #luckyBlocksList == 0 then
+                    print("⏸️ Tidak ada lucky block, tunggu 5 detik...")
+                    task.wait(5)
+                    scanLuckyBlocks()
+                end
+            end
+            
+            -- Ambil block berikutnya
+            local block = luckyBlocksList[currentBlockIndex]
+            if block then
+                print("\n🎯 Memproses:", block.name)
+                
+                -- Terbang ke posisi block (Y=-2)
+                local targetPos = Vector3.new(block.position.X, -2, block.position.Z)
+                flyToPosition(targetPos, 800) -- Speed 800 studs/detik
+                
+                -- Trigger prompt
+                triggerPrompt(block.prompt, block.name)
+                
+                task.wait(0.5)
+
+                -- Kembali ke spawn (Y=-2)
+                if spawnPosition then
+                    print("🏠 Kembali ke spawn...")
+                    flyToPosition(Vector3.new(spawnPosition.X, -2, spawnPosition.Z), 800)
+                end
+                
+                -- Lanjut ke block berikutnya
+                currentBlockIndex = currentBlockIndex + 1
+                
+                -- Delay antar block
+                task.wait(1)
+            else
+                currentBlockIndex = currentBlockIndex + 1
+            end
+        end
+    end)
+end
+
+local function stopAutoFarm()
+    autoFarmActive = false
+    
+    -- Matikan fly
+    flyActive = false
+    if flyConn then
+        flyConn:Disconnect()
+        flyConn = nil
+    end
+    
+    if bodyVelocity then
+        pcall(function() bodyVelocity:Destroy() end)
+        bodyVelocity = nil
+    end
+    
+    -- Matikan noclip
+    noclipActive = false
+    if noclipConn then
+        noclipConn:Disconnect()
+        noclipConn = nil
+    end
+    
+    print("⏹️ AUTO FARM DIMATIKAN")
+end
+
+-- ===========================================
+-- =========== TOWER EXPLOIT SECTION ===========
+-- ===========================================
+
+-- Variables untuk Tower
+local TowerState = {
+    phase = "unknown",
+    requirement = nil,
+    brought = {},
+    trialEnd = 0,
+    cooldownEnd = 0,
+    combo = 0,
+    maxCombo = 0
+}
+
+local TowerObjects = {
+    model = nil,
+    prompt = nil,
+    center = nil,
+    resultSpawn = nil,
+    billboard = nil,
+    timerLabel = nil,
+    requirementLabel = nil,
+    comboLabel = nil
+}
+
+local TowerConnections = {}
+local TowerActive = false
+local TowerAutoComplete = false
+local TowerAutoSubmit = false
+local TowerESPActive = false
+local TowerAntiCooldown = false
+local TowerTimerFreeze = false
+local TowerAutoClaim = false
+
+-- ESP Holder
+local TowerESP = {}
+
+-- ===========================================
+-- FUNGSI FIND TOWER
+-- ===========================================
+local function findTower()
+    local CollectionService = game:GetService("CollectionService")
+    local towers = CollectionService:GetTagged("Tower")
+    
+    if #towers > 0 then
+        TowerObjects.model = towers[1]
+        print("🏰 Tower ditemukan:", TowerObjects.model.Name)
+        
+        -- Cari komponen tower
+        if TowerObjects.model.PrimaryPart then
+            local primary = TowerObjects.model.PrimaryPart
+            
+            TowerObjects.prompt = primary:FindFirstChild("Prompt")
+            TowerObjects.center = primary:FindFirstChild("Center")
+            TowerObjects.resultSpawn = primary:FindFirstChild("ResultSpawn")
+            
+            local billboard = primary:FindFirstChild("Billboard")
+            if billboard then
+                TowerObjects.billboard = billboard:FindFirstChildOfClass("BillboardGui")
+            end
+        end
+        
+        return true
+    end
+    
+    return false
+end
+
+-- ===========================================
+-- FUNGSI WAIT FOR TOWER
+-- ===========================================
+local function waitForTower()
+    local CollectionService = game:GetService("CollectionService")
+    
+    -- Coba cari yang sudah ada
+    if findTower() then
+        return true
+    end
+    
+    -- Tunggu sampai tower muncul
+    print("⏳ Menunggu tower muncul...")
+    local timeout = 30
+    local start = os.clock()
+    
+    while os.clock() - start < timeout do
+        if findTower() then
+            print("✅ Tower ditemukan setelah menunggu")
+            return true
+        end
+        task.wait(1)
+    end
+    
+    print("❌ Tower tidak ditemukan dalam 30 detik")
+    return false
+end
+
+-- ===========================================
+-- FUNGSI REMOTE SPOOFING
+-- ===========================================
+local function getRemotes()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local remotes = {}
+    
+    -- Coba dapatkan dari Shared.Remotes
+    local shared = ReplicatedStorage:FindFirstChild("Shared")
+    if shared then
+        local remotesModule = shared:FindFirstChild("Remotes")
+        if remotesModule then
+            -- Ini adalah module, kita perlu require
+            local success, result = pcall(function()
+                return require(remotesModule)
+            end)
+            if success and type(result) == "table" then
+                remotes = result
+            end
+        end
+    end
+    
+    -- Fallback: cari remote langsung
+    if not next(remotes) then
+        for _, child in ipairs(ReplicatedStorage:GetDescendants()) do
+            if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+                if string.find(child.Name, "Tower") then
+                    remotes[child.Name] = child
+                end
+            end
+        end
+    end
+    
+    return remotes
+end
+
+-- ===========================================
+-- FUNGSI GET TOWER STATE
+-- ===========================================
+local function getTowerState()
+    local remotes = getRemotes()
+    
+    -- Coba panggil remote untuk get state
+    for name, remote in pairs(remotes) do
+        if string.find(name, "TowerState") or string.find(name, "GetTowerState") then
+            if remote:IsA("RemoteFunction") then
+                local success, result = pcall(function()
+                    return remote:InvokeServer()
+                end)
+                if success and result then
+                    return result
+                end
+            elseif remote:IsA("RemoteEvent") then
+                -- Untuk RemoteEvent kita perlu hook atau cara lain
+                -- Ini lebih kompleks, skip dulu
+            end
+        end
+    end
+    
+    return nil
+end
+
+-- ===========================================
+-- FUNGSI AUTO COMPLETE TRIAL
+-- ===========================================
+local function autoCompleteTrial()
+    if not TowerObjects.model then return end
+    
+    local remotes = getRemotes()
+    
+    -- Cari remote untuk complete trial
+    for name, remote in pairs(remotes) do
+        if string.find(name, "TowerComplete") or string.find(name, "CompleteTrial") then
+            pcall(function()
+                remote:FireServer()
+                print("✅ Auto Complete Trial executed")
+            end)
+            break
+        end
+    end
+end
+
+-- ===========================================
+-- FUNGSI AUTO SUBMIT BRAINROT
+-- ===========================================
+local function autoSubmitBrainrot()
+    if not TowerObjects.model then return end
+    if not TowerState.requirement then return end
+    
+    -- Cari brainrot di inventory atau di sekitar
+    local player = game:GetService("Players").LocalPlayer
+    local backpack = player:FindFirstChild("Backpack")
+    
+    if backpack then
+        for _, item in ipairs(backpack:GetChildren()) do
+            -- Cek apakah item adalah brainrot yang diminta
+            local itemName = string.lower(item.Name)
+            local reqName = string.lower(TowerState.requirement)
+            
+            if string.find(itemName, reqName) then
+                -- Coba submit
+                local remotes = getRemotes()
+                for name, remote in pairs(remotes) do
+                    if string.find(name, "Submit") then
+                        pcall(function()
+                            remote:FireServer(item)
+                            print("✅ Auto Submit:", item.Name)
+                        end)
+                        break
+                    end
+                end
+                break
+            end
+        end
+    end
+end
+
+-- ===========================================
+-- FUNGSI TOWER ESP
+-- ===========================================
+local function createESP(part, name, color)
+    if not part then return nil end
+    
+    -- Bersihkan ESP lama
+    if TowerESP[part] then
+        pcall(function() TowerESP[part]:Destroy() end)
+        TowerESP[part] = nil
+    end
+    
+    -- Buat BillboardGui
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "TowerESP"
+    billboard.Adornee = part
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 0.3
+    frame.BackgroundColor3 = color or Color3.new(1, 0, 0)
+    frame.Parent = billboard
+    
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.Text = name or "Tower"
+    text.TextColor3 = Color3.new(1, 1, 1)
+    text.TextStrokeTransparency = 0.5
+    text.TextStrokeColor3 = Color3.new(0, 0, 0)
+    text.Font = Enum.Font.GothamBold
+    text.TextSize = 16
+    text.Parent = frame
+    
+    billboard.Parent = game:GetService("CoreGui")
+    
+    TowerESP[part] = billboard
+    return billboard
+end
+
+local function toggleTowerESP(enable)
+    if enable then
+        if TowerObjects.model and TowerObjects.model.PrimaryPart then
+            createESP(TowerObjects.model.PrimaryPart, "🏰 TOWER", Color3.new(1, 0, 0))
+            
+            if TowerObjects.center then
+                createESP(TowerObjects.center, "📍 CENTER", Color3.new(0, 1, 0))
+            end
+            
+            if TowerObjects.resultSpawn then
+                createESP(TowerObjects.resultSpawn, "🎁 RESULT", Color3.new(0, 0, 1))
+            end
+        end
+        
+        -- ESP untuk brainrot di sekitar
+        local CollectionService = game:GetService("CollectionService")
+        local brainrots = CollectionService:GetTagged("Brainrot")
+        
+        for _, brainrot in ipairs(brainrots) do
+            if brainrot.PrimaryPart then
+                createESP(brainrot.PrimaryPart, "🧠 " .. brainrot.Name, Color3.new(1, 1, 0))
+            end
+        end
+    else
+        for _, esp in pairs(TowerESP) do
+            pcall(function() esp:Destroy() end)
+        end
+        table.clear(TowerESP)
+    end
+end
+
+-- ===========================================
+-- FUNGSI ANTI COOLDOWN
+-- ===========================================
+local function applyAntiCooldown()
+    if not TowerObjects.billboard then return end
+    
+    -- Cari elemen cooldown dan sembunyikan/disable
+    local cooldownContainer = TowerObjects.billboard:FindFirstChild("Frame"):FindFirstChild("Info"):FindFirstChild("CooldownContainer")
+    if cooldownContainer then
+        cooldownContainer.Visible = false
+    end
+end
+
+-- ===========================================
+-- FUNGSI TIMER FREEZE
+-- ===========================================
+local function applyTimerFreeze()
+    if not TowerObjects.billboard then return end
+    
+    -- Cari elemen timer
+    local trialTimer = TowerObjects.billboard:FindFirstChild("Frame"):FindFirstChild("Info"):FindFirstChild("TrialTimerContainer")
+    if trialTimer then
+        local timeLabel = trialTimer:FindFirstChild("TimeLabel")
+        if timeLabel then
+            -- Hook ke property Text biar selalu nampilin waktu tetap
+            local mt = getrawmetatable(game)
+            local old = mt.__newindex
+            setreadonly(mt, false)
+            
+            mt.__newindex = function(t, k, v)
+                if t == timeLabel and k == "Text" then
+                    -- Selalu set ke "99:99" atau frozen
+                    return old(t, k, "99:99")
+                end
+                return old(t, k, v)
+            end
+            
+            setreadonly(mt, true)
+        end
+    end
+end
+
+-- ===========================================
+-- FUNGSI AUTO CLAIM REWARD
+-- ===========================================
+local function autoClaimReward()
+    if not TowerObjects.model then return end
+    
+    local remotes = getRemotes()
+    
+    -- Cari remote untuk claim
+    for name, remote in pairs(remotes) do
+        if string.find(name, "Claim") or string.find(name, "TowerConfirmClaim") then
+            pcall(function()
+                remote:FireServer()
+                print("✅ Auto Claim Reward executed")
+            end)
+            break
+        end
+    end
+end
+
+-- ===========================================
+-- FUNGSI INFINITE COMBO
+-- ===========================================
+local function setInfiniteCombo()
+    -- Manipulasi UI combo
+    if TowerObjects.billboard then
+        local luckContainer = TowerObjects.billboard:FindFirstChild("Frame"):FindFirstChild("Info"):FindFirstChild("LuckContainer")
+        if luckContainer then
+            local luckAmount = luckContainer:FindFirstChild("LuckAmount")
+            if luckAmount then
+                luckAmount.Text = "999x"
+            end
+            
+            local fillBar = luckContainer:FindFirstChild("BarBackground"):FindFirstChild("FillBar")
+            if fillBar then
+                fillBar.Size = UDim2.new(1, 0, 1, 0)
+            end
+        end
+    end
+end
+
+-- ===========================================
+-- FUNGSI TELEPORT KE TOWER
+-- ===========================================
+local function teleportToTower()
+    if not TowerObjects.model or not TowerObjects.model.PrimaryPart then return end
+    
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local targetPos = TowerObjects.model.PrimaryPart.Position
+    rootPart.CFrame = CFrame.new(targetPos.X, targetPos.Y + 5, targetPos.Z)
+    
+    print("🚀 Teleport ke tower")
+end
+
+-- ===========================================
+-- FUNGSI TOWER FARM LOOP
+-- ===========================================
+local function startTowerFarm()
+    if TowerActive then return end
+    
+    -- Cari tower dulu
+    if not TowerObjects.model then
+        if not waitForTower() then
+            print("❌ Gagal menemukan tower")
+            return
+        end
+    end
+    
+    TowerActive = true
+    print("🏰 TOWER FARM DIMULAI!")
+    
+    -- Loop utama
+    spawn(function()
+        while TowerActive do
+            task.wait(1)
+            
+            if not TowerObjects.model then
+                findTower()
+            end
+            
+            -- Apply berbagai fitur
+            if TowerAntiCooldown then
+                applyAntiCooldown()
+            end
+            
+            if TowerTimerFreeze then
+                applyTimerFreeze()
+            end
+            
+            setInfiniteCombo()
+            
+            -- Auto submit
+            if TowerAutoSubmit then
+                autoSubmitBrainrot()
+            end
+            
+            -- Auto complete
+            if TowerAutoComplete and TowerState.phase == "trial" then
+                -- Cek apakah sudah memenuhi syarat
+                if #TowerState.brought >= 3 then -- MinDeposits
+                    autoCompleteTrial()
+                end
+            end
+            
+            -- Auto claim
+            if TowerAutoClaim and TowerState.phase == "complete" then
+                autoClaimReward()
+            end
+            
+            -- Remote spoofing untuk bypass requirement
+            if TowerState.phase == "trial" and TowerState.requirement then
+                -- Force UI untuk menerima brainrot apapun
+                if TowerObjects.billboard then
+                    local requirementLabel = TowerObjects.billboard:FindFirstChild("Frame"):FindFirstChild("Info"):FindFirstChild("Requirement")
+                    if requirementLabel then
+                        requirementLabel.Visible = false
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function stopTowerFarm()
+    TowerActive = false
+    print("⏹️ TOWER FARM DIMATIKAN")
+end
+
+-- ===========================================
+-- FUNGSI SCAN TOWER STATE
+-- ===========================================
+local function scanTowerState()
+    if not TowerObjects.model then
+        findTower()
+    end
+    
+    local state = getTowerState()
+    if state then
+        TowerState = state
+        print("📊 Tower State:", TowerState.phase)
+        if TowerState.requirement then
+            print("   Requirement:", TowerState.requirement)
+        end
+        print("   Deposits:", #TowerState.brought)
+        print("   Combo:", TowerState.combo)
+        return true
+    else
+        -- Fallback: baca dari UI
+        if TowerObjects.billboard then
+            local info = TowerObjects.billboard:FindFirstChild("Frame"):FindFirstChild("Info")
+            if info then
+                local infoText = info:FindFirstChild("InfoText")
+                if infoText then
+                    print("📊 Tower UI Text:", infoText.Text)
+                end
+                
+                local requirement = info:FindFirstChild("Requirement")
+                if requirement and requirement.Visible then
+                    print("   Requirement visible")
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+-- ===========================================
+-- UI TOWER TAB
+-- ===========================================
+local TowerTab = Window:CreateTab("🏰 Tower Exploit", 4483362458)
+
+-- Status Section
+TowerTab:CreateParagraph({
+    Title = "📊 TOWER STATUS",
+    Content = "Klik 'Scan Tower' untuk melihat status"
+})
+
+-- Button Find Tower
+TowerTab:CreateButton({
+    Name = "🔍 FIND TOWER",
+    Callback = function()
+        if findTower() then
+            Rayfield:Notify({
+                Title = "✅ Tower Ditemukan",
+                Content = TowerObjects.model.Name,
+                Duration = 3
+            })
+        else
+            Rayfield:Notify({
+                Title = "❌ Tower Tidak Ditemukan",
+                Content = "Coba di area tower",
+                Duration = 3
+            })
+        end
+    end
+})
+
+-- Button Scan State
+TowerTab:CreateButton({
+    Name = "📋 SCAN TOWER STATE",
+    Callback = function()
+        if scanTowerState() then
+            Rayfield:Notify({
+                Title = "📊 State Terdeteksi",
+                Content = "Phase: " .. TowerState.phase,
+                Duration = 3
+            })
+        else
+            Rayfield:Notify({
+                Title = "❌ Gagal Scan",
+                Content = "Coba 'Find Tower' dulu",
+                Duration = 3
+            })
+        end
+    end
+})
+
+-- Toggle Auto Complete
+TowerTab:CreateToggle({
+    Name = "✅ AUTO COMPLETE TRIAL",
+    CurrentValue = false,
+    Callback = function(Value)
+        TowerAutoComplete = Value
+        if Value and not TowerActive then
+            startTowerFarm()
+        elseif not Value and not TowerAutoSubmit and not TowerAutoClaim then
+            stopTowerFarm()
+        end
+    end
+})
+
+-- Toggle Auto Submit
+TowerTab:CreateToggle({
+    Name = "📤 AUTO SUBMIT BRAINROT",
+    CurrentValue = false,
+    Callback = function(Value)
+        TowerAutoSubmit = Value
+        if Value and not TowerActive then
+            startTowerFarm()
+        elseif not Value and not TowerAutoComplete and not TowerAutoClaim then
+            stopTowerFarm()
+        end
+    end
+})
+
+-- Toggle Auto Claim
+TowerTab:CreateToggle({
+    Name = "🎁 AUTO CLAIM REWARD",
+    CurrentValue = false,
+    Callback = function(Value)
+        TowerAutoClaim = Value
+        if Value and not TowerActive then
+            startTowerFarm()
+        elseif not Value and not TowerAutoComplete and not TowerAutoSubmit then
+            stopTowerFarm()
+        end
+    end
+})
+
+-- Toggle ESP
+TowerTab:CreateToggle({
+    Name = "👁️ TOWER ESP",
+    CurrentValue = false,
+    Callback = function(Value)
+        TowerESPActive = Value
+        toggleTowerESP(Value)
+    end
+})
+
+-- Toggle Anti Cooldown
+TowerTab:CreateToggle({
+    Name = "⏱️ ANTI COOLDOWN",
+    CurrentValue = false,
+    Callback = function(Value)
+        TowerAntiCooldown = Value
+    end
+})
+
+-- Toggle Timer Freeze
+TowerTab:CreateToggle({
+    Name = "❄️ TIMER FREEZE",
+    CurrentValue = false,
+    Callback = function(Value)
+        TowerTimerFreeze = Value
+    end
+})
+
+-- Button Teleport to Tower
+TowerTab:CreateButton({
+    Name = "🚀 TELEPORT KE TOWER",
+    Callback = function()
+        teleportToTower()
+        Rayfield:Notify({
+            Title = "✅ Teleport",
+            Content = "Ke posisi tower",
+            Duration = 2
+        })
+    end
+})
+
+-- Button Infinite Combo
+TowerTab:CreateButton({
+    Name = "♾️ SET INFINITE COMBO",
+    Callback = function()
+        setInfiniteCombo()
+        Rayfield:Notify({
+            Title = "✅ Combo Set",
+            Content = "Infinite combo activated",
+            Duration = 2
+        })
+    end
+})
+
+-- Button Requirement Bypass
+TowerTab:CreateButton({
+    Name = "🚫 BYPASS REQUIREMENT",
+    Callback = function()
+        if TowerObjects.billboard then
+            local requirement = TowerObjects.billboard:FindFirstChild("Frame"):FindFirstChild("Info"):FindFirstChild("Requirement")
+            if requirement then
+                requirement.Visible = false
+                requirement.Parent.Visible = true
+            end
+        end
+        Rayfield:Notify({
+            Title = "✅ Bypass",
+            Content = "Requirement di-hidden",
+            Duration = 2
+        })
+    end
+})
+
+-- Button Manual Complete
+TowerTab:CreateButton({
+    Name = "⚡ MANUAL COMPLETE",
+    Callback = function()
+        autoCompleteTrial()
+    end
+})
+
+-- Button Manual Claim
+TowerTab:CreateButton({
+    Name = "💰 MANUAL CLAIM",
+    Callback = function()
+        autoClaimReward()
+    end
+})
+
+-- Stop All Toggle
+TowerTab:CreateToggle({
+    Name = "⏹️ STOP ALL TOWER FEATURES",
+    CurrentValue = false,
+    Callback = function(Value)
+        if Value then
+            stopTowerFarm()
+            TowerAutoComplete = false
+            TowerAutoSubmit = false
+            TowerAutoClaim = false
+            TowerESPActive = false
+            TowerAntiCooldown = false
+            TowerTimerFreeze = false
+            toggleTowerESP(false)
+        end
+    end
+})
+
+-- Info Section
+TowerTab:CreateParagraph({
+    Title = "ℹ️ FITUR TOWER",
+    Content = [[
+✅ Auto Complete Trial - Selesaikan trial otomatis
+📤 Auto Submit Brainrot - Submit brainrot yang diminta
+🎁 Auto Claim Reward - Klaim reward otomatis
+👁️ Tower ESP - Lihat tower dari jauh
+⏱️ Anti Cooldown - Hilangkan cooldown
+❄️ Timer Freeze - Waktu trial berhenti
+🚀 Teleport - Langsung ke tower
+♾️ Infinite Combo - Luck multiplier max
+🚫 Bypass Requirement - Submit brainrot apapun
+
+Cara pakai:
+1. Find Tower dulu
+2. Aktifkan fitur yang diinginkan
+3. Biarkan auto farm jalan
+]]
+})
+
+-- ===========================================
+-- =========== END TOWER SECTION ===========
+-- ===========================================
+
+-- ===========================================
+-- UI (LANJUTAN)
+-- ===========================================
+local Window = Rayfield:CreateWindow({
+    Name = "🤖 AUTO LUCKY BLOCK FARMER + TOWER EXPLOIT",
+    LoadingTitle = "Loading...",
+    LoadingSubtitle = "Y=-2 Mode + Tower Exploit",
+    ConfigurationSaving = { Enabled = true },
+    KeySystem = false
+})
+
+local MainTab = Window:CreateTab("🎮 Kontrol", 4483362458)
+local InfoTab = Window:CreateTab("ℹ️ Info", 4483362458)
+-- TowerTab sudah dibuat di atas
+
+-- MAIN TAB
+MainTab:CreateParagraph({
+    Title = "📊 STATUS",
+    Content = "Posisi: Y = -2 (Aman dari Tsunami)\nMode: Terbang Cepat + Trigger"
+})
+
+-- Tombol save spawn
+MainTab:CreateButton({
+    Name = "📍 SIMPAN POSISI SPAWN",
+    Callback = function()
+        if saveSpawnPosition() then
+            Rayfield:Notify({
+                Title = "✅ Spawn Disimpan",
+                Content = tostring(spawnPosition),
+                Duration = 2
+            })
+        end
+    end
+})
+
+-- Tombol scan
+MainTab:CreateButton({
+    Name = "🔍 SCAN LUCKY BLOCKS",
+    Callback = function()
+        local count = scanLuckyBlocks()
+        Rayfield:Notify({
+            Title = "📊 Hasil Scan",
+            Content = count .. " lucky block ditemukan",
+            Duration = 3
+        })
+    end
+})
+
+-- Tombol set Y=-2
+MainTab:CreateButton({
+    Name = "⬇️ SET Y = -2 + FLY",
+    Callback = function()
+        setYminus2()
+        Rayfield:Notify({
+            Title = "✅ Y = -2 Aktif",
+            Content = "Kamu aman dari tsunami",
+            Duration = 2
+        })
+    end
+})
+
+-- Toggle auto farm
+MainTab:CreateToggle({
+    Name = "🤖 AUTO FARM ON/OFF",
+    CurrentValue = false,
+    Callback = function(Value)
+        if Value then
+            startAutoFarm()
+        else
+            stopAutoFarm()
+        end
+    end
+})
+
+-- Manual trigger
+MainTab:CreateButton({
+    Name = "⚡ TEST TRIGGER (Block Pertama)",
+    Callback = function()
+        if #luckyBlocksList == 0 then
+            scanLuckyBlocks()
+        end
+        
+        if #luckyBlocksList > 0 then
+            setYminus2()
+            local block = luckyBlocksList[1]
+            
+            -- Terbang ke block
+            local targetPos = Vector3.new(block.position.X, -2, block.position.Z)
+            flyToPosition(targetPos, 800)
+            
+            -- Trigger
+            triggerPrompt(block.prompt, block.name)
+            
+            -- Kembali ke spawn
+            if spawnPosition then
+                flyToPosition(Vector3.new(spawnPosition.X, -2, spawnPosition.Z), 800)
+            end
+        else
+            Rayfield:Notify({
+                Title = "❌ Tidak ada block",
+                Duration = 2
+            })
+        end
+    end
+})
+
+-- INFO TAB
+InfoTab:CreateParagraph({
+    Title = "📋 CARA KERJA (LUCKY BLOCK)",
+    Content = [[
+1. Posisi Y = -2 (aman tsunami)
+2. Fly aktif biar ga jatuh
+3. Scan semua lucky block
+4. Terbang cepat ke target
+5. Trigger prompt
+6. Kembali ke spawn
+7. Ulangi ke block berikutnya
+
+⚡ Speed terbang: 800 studs/detik
+🛡️ Noclip aktif (tembus apapun)
+]]
+})
+
+InfoTab:CreateParagraph({
+    Title = "🏰 CARA KERJA (TOWER EXPLOIT)",
+    Content = [[
+1. Find Tower di tab Tower
+2. Aktifkan fitur yang diinginkan
+3. Auto farm tower berjalan otomatis
+
+Fitur: Auto Complete, Auto Submit,
+Auto Claim, ESP, Anti Cooldown,
+Timer Freeze, Infinite Combo,
+Requirement Bypass
+]]
+})
+
+InfoTab:CreateParagraph({
+    Title = "🎮 CONTROL",
+    Content = [[
+📍 Simpan spawn dulu
+🔍 Scan biar dapet list
+🤖 Auto farm ON
+🏰 Buka tab Tower untuk exploit
+
+Pastikan Y=-2 sudah aktif!
+]]
+})
+
+-- ===========================================
+-- INIT
+-- ===========================================
+task.wait(1)
+
+-- Auto scan lucky blocks
+local count = scanLuckyBlocks()
+saveSpawnPosition()
+setYminus2()
+
+-- Auto find tower (background)
+spawn(function()
+    task.wait(3)
+    findTower()
+end)
+
+print("\n=== AUTO LUCKY BLOCK FARMER + TOWER EXPLOIT READY ===")
+print("📍 Spawn position saved")
+print("⬇️ Y = -2 active")
+print("📊 Lucky blocks found:", count)
+print("🏰 Tower exploit available di tab Tower")
+print("🤖 Aktifkan toggle Auto Farm untuk lucky block")
